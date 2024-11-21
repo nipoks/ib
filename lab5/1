@@ -1,0 +1,36 @@
+def rc4_encrypt_decrypt_hex(key, input_data):
+    S = list(range(256))
+    j = 0
+
+
+    for i in range(256):  # Key-Scheduling Algorithm
+        j = (j + S[i] + key[i % len(key)]) % 256
+        S[i], S[j] = S[j], S[i]
+
+
+    i = j = 0             # Pseudo-Random Generation Algorithm
+    keystream = []
+    for _ in range(len(input_data)):
+        i = (i + 1) % 256
+        j = (j + S[i]) % 256
+        S[i], S[j] = S[j], S[i]
+        keystream.append(S[(S[i] + S[j]) % 256])
+
+                          # XOR
+    output_data = bytes([input_data[n] ^ keystream[n] for n in range(len(input_data))])
+    return output_data.hex()
+
+# hex - байт двумя символами в диапазоне 0-9 и A-F
+
+key = "my_secret_key".encode('utf-8')  # в байты
+plaintext = input().encode('utf-8')
+
+ciphertext_hex = rc4_encrypt_decrypt_hex(key, plaintext)
+
+ciphertext_bytes = bytes.fromhex(ciphertext_hex)  # в байты
+decrypted_bytes = bytes.fromhex(rc4_encrypt_decrypt_hex(key, ciphertext_bytes))
+
+decrypted_text = decrypted_bytes.decode('utf-8')  # байты в текст
+
+print("Ciphertext:", ciphertext_hex)
+print("Decrypted text:", decrypted_text)
