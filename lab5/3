@@ -1,0 +1,108 @@
+SBOX = [0xC, 0x5, 0x6, 0xB, 0x9, 0x0, 0xA, 0xD, 0x3, 0xE, 0xF, 0x8, 0x4, 0x7, 0x1, 0x2]
+SBOX_INV = [SBOX.index(x) for x in range(16)]
+PBOX = [0, 16, 32, 48, 1, 17, 37, 49, 2, 18, 34, 50, 3, 19, 35, 51,
+        4, 20, 36, 52, 5, 21, 33, 53, 6, 22, 38, 54, 7, 23, 39, 55,
+        8, 24, 40, 56, 9, 25, 41, 57, 10, 26, 42, 58, 11, 27, 43, 59,
+        12, 28, 44, 60, 13, 29, 45, 61, 14, 30, 46, 62, 15, 31, 47, 63]
+PBOX_INV = [PBOX.index(x) for x in range(64)]
+
+
+def generate_round_keys(key, rounds=31):
+    round_keys = []
+    for i in range(1, rounds + 2):
+        round_keys.append(key >> 16)
+        key = ((key & (2**19 - 1)) << 61) | (key >> 19)
+        key = (SBOX[key >> 76] << 76) | (key & (2**76 - 1))
+        key ^= i << 15
+    return round_keys
+
+
+# Шифрование одного блока
+def encrypt_block(block, round_keys, rounds=31):
+    for i in range(rounds):
+        block ^= round_keys[i]
+        block = substitution(block)
+        block = permutation(block)
+    block ^= round_keys[-1]
+    return block
+
+
+# Расшифрование одного блока
+def decrypt_block(block, round_keys, rounds=31):
+    block ^= round_keys[-1]
+    for i in range(rounds - 1, -1, -1):
+        block = inverse_permutation(block)
+        block = inverse_substitution(block)
+        block ^= round_keys[i]
+    return block
+
+
+# S-блок подстановки
+def substitution(block):
+    output = 0
+    for i in range(16):
+        nibble = (block >> (i * 4)) & 0xF
+        output |= SBOX[nibble] << (i * 4)
+    return output
+
+
+# Обратный S-блок
+def inverse_substitution(block):
+    output = 0
+    for i in range(16):
+        nibble = (block >> (i * 4)) & 0xF
+        output |= SBOX_INV[nibble] << (i * 4)
+    return output
+
+
+# P-блок перестановки
+def permutation(block):
+    output = 0
+    for i in range(64):
+        bit = (block >> i) & 1
+        output |= bit << PBOX[i]
+    return output
+
+
+# Обратный P-блок
+def inverse_permutation(block):
+    output = 0
+    for i in range(64):
+        bit = (block >> i) & 1
+        output |= bit << PBOX_INV[i]
+    return output
+
+
+def present_hash(data, key, block_size=64, rounds=31):
+
+    if isinstance(data, str):
+        data = data.encode('utf-8')
+
+    blocks = [data[i:i + block_size // 8] for i in range(0, len(data), block_size // 8)]
+
+    # к последнему нули добавим если не полный
+    if len(blocks[-1]) < block_size // 8:
+        blocks[-1] = blocks[-1] + b'\x00' * (block_size // 8 - len(blocks[-1]))
+
+    hash_value = 0
+
+    round_keys = generate_round_keys(key)
+
+    for block in blocks:
+        block_value = int.from_bytes(block, byteorder='big')
+
+        block_value ^= hash_value
+
+        encrypted_block = encrypt_block(block_value, round_keys)
+
+        hash_value = encrypted_block
+
+    return hash_value  # хеш 64-битное число
+
+
+data = "Улыбок тебе дед макар"
+key = 0x000d0a040006f0008001  # 80-битный ключ для шифра Present
+
+hash_result = present_hash(data, key)
+
+print(f"Хеш данных: {hex(hash_result)}")
